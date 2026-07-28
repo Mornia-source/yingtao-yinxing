@@ -63,6 +63,9 @@ def main():
         code = zrm + shp
         out_lines.append("%s\t%s\t%d" % (char, code, weight + WEIGHT_BOOST))
         map_lines.append("%s\t%s\t%d" % (char, code, weight))
+        # 双拼码打完(2位)即可作为同音字候选出现，权重按字频排序，
+        # 不必非要把形码也打完才能看到这个字；形码留给需要精确选字的时候用。
+        out_lines.append("%s\t%s\t%d" % (char, zrm, weight + WEIGHT_BOOST))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")
