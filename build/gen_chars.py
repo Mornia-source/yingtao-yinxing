@@ -8,7 +8,6 @@ _SOURCES = os.path.join(_HERE, "..", "sources")
 
 SRC = os.path.join(_SOURCES, "8105.dict.yaml")
 OUT = os.path.join(_HERE, "yingtao_chars.dict.yaml")
-OUT_MAP = os.path.join(_HERE, "char_code_map.tsv")  # char \t code \t weight (for word-building step)
 
 # Single characters and words share one merged dictionary sorted by weight.
 # Boost every char's weight well above the word table's ceiling (~7e5) so a
@@ -42,7 +41,6 @@ def main():
     enc = ShapeEncoder()
     rows = load_rows()
     out_lines = []
-    map_lines = []
     stats = {"decomp": 0, "own-full": 0, "own1": 0, "fail": 0}
     missing = []
     for char, pinyin, weight in rows:
@@ -62,7 +60,6 @@ def main():
             continue
         code = zrm + shp
         out_lines.append("%s\t%s\t%d" % (char, code, weight + WEIGHT_BOOST))
-        map_lines.append("%s\t%s\t%d" % (char, code, weight))
         # 双拼码打完(2位)即可作为同音字候选出现，权重按字频排序，
         # 不必非要把形码也打完才能看到这个字；形码留给需要精确选字的时候用。
         out_lines.append("%s\t%s\t%d" % (char, zrm, weight + WEIGHT_BOOST))
@@ -74,10 +71,6 @@ def main():
         f.write("# 数据来源: rime-ice(拼音/字频), lotem/rime-wubi98(官方五笔全码), hanzi-chai/pychai(汉字结构拆分)\n")
         f.write("#\n---\nname: yingtao_chars\nversion: \"1.0\"\nsort: by_weight\n...\n")
         for l in out_lines:
-            f.write(l + "\n")
-
-    with io.open(OUT_MAP, "w", encoding="utf-8", newline="\n") as f:
-        for l in map_lines:
             f.write(l + "\n")
 
     print("total rows:", len(rows))
