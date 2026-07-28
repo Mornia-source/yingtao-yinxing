@@ -2,17 +2,13 @@
 import io, os
 from shape import ShapeEncoder
 from zrm import encode_zrm
+from tier_boost import boosted_weight
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _SOURCES = os.path.join(_HERE, "..", "sources")
 
 SRC = os.path.join(_SOURCES, "8105.dict.yaml")
 OUT = os.path.join(_HERE, "yingtao_chars.dict.yaml")
-
-# Single characters and words share one merged dictionary sorted by weight.
-# Boost every char's weight well above the word table's ceiling (~7e5) so a
-# character always outranks any word that happens to collide on the same code.
-WEIGHT_BOOST = 200_000_000
 
 
 def load_rows():
@@ -59,10 +55,10 @@ def main():
             missing.append((char, pinyin, "noshape"))
             continue
         code = zrm + shp
-        out_lines.append("%s\t%s\t%d" % (char, code, weight + WEIGHT_BOOST))
+        out_lines.append("%s\t%s\t%d" % (char, code, boosted_weight(code, weight)))
         # 双拼码打完(2位)即可作为同音字候选出现，权重按字频排序，
         # 不必非要把形码也打完才能看到这个字；形码留给需要精确选字的时候用。
-        out_lines.append("%s\t%s\t%d" % (char, zrm, weight + WEIGHT_BOOST))
+        out_lines.append("%s\t%s\t%d" % (char, zrm, boosted_weight(zrm, weight)))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")

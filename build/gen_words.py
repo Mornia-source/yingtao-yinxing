@@ -2,6 +2,7 @@
 import io, os
 from shape import ShapeEncoder
 from zrm import encode_zrm
+from tier_boost import boosted_weight
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _SOURCES = os.path.join(_HERE, "..", "sources")
@@ -115,7 +116,7 @@ def main():
         f.write("# 词库来源: rime-ice base.dict.yaml, chengyu.dict.yaml\n")
         f.write("#\n---\nname: yingtao_words\nversion: \"1.0\"\nsort: by_weight\n...\n")
         for text, code, weight in out:
-            f.write("%s\t%s\t%d\n" % (text, code, weight))
+            f.write("%s\t%s\t%d\n" % (text, code, boosted_weight(code, weight)))
 
     print("source rows:", len(rows), "skipped:", skipped, "written:", len(out))
 
