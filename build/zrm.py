@@ -5,9 +5,12 @@ _PLAIN = "qwrtyuiopsdfghmjcklzxvbn"
 _XLIT = dict(zip(_CIRCLED, _PLAIN))
 
 # kind: 'sub' = plain re.sub with backreferences; 'final' = (\w+?)FINAL(;.*) -> group1+mark+group2
+#
+# 零声母的 an/en/ai/ei/ao/ou 本身拼写正好就是2个字母，不再重复"重复声母再
+# 压缩韵母"这一套（例如"按(an)"直接就是 an，不再算成 aj）；只有 a/e/o 单独
+# 或带 ng 的零声母（a/e/o/ang/eng）才需要重复首字母来腾出韵母键位。
 _RULES = [
     ('sub', r'^([jqxy])u(;.*)$', r'\1v\2'),
-    ('sub', r'^([aoe])([ioun])(;.*)$', r'\1\1\2\3'),
     ('sub', r'^([aoe])(ng)?(;.*)$', r'\1\1\2\3'),
     ('final', r'^(\w+?)iu(;.*)$', 'Ⓠ'),
     ('final', r'^(\w+?)[uv]an(;.*)$', 'Ⓡ'),
@@ -58,6 +61,20 @@ def encode_zrm(pinyin):
         s = s[:-1]
     out = ''.join(_XLIT.get(ch, ch) for ch in s)
     return out
+
+
+_BARE_V_FINAL = re.compile(r'^[jqxy]u$')
+
+
+def encode_zrm_variants(pinyin):
+    """像 ju/qu/xu/yu 这样的纯ü韵母字，ü键位既可以打v也可以直接打u
+    (x/j/q/y从不真正跟"u"这个韵母搭配，所以复用u键不会有歧义)。
+    返回该拼音全部等价双拼编码，通常只有一个。"""
+    code = encode_zrm(pinyin)
+    variants = [code]
+    if _BARE_V_FINAL.match(pinyin) and code.endswith('v'):
+        variants.append(code[:-1] + 'u')
+    return variants
 
 
 if __name__ == "__main__":

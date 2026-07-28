@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import io, os
 from shape import ShapeEncoder
-from zrm import encode_zrm
+from zrm import encode_zrm, encode_zrm_variants
 from tier_boost import boosted_weight
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -44,21 +44,22 @@ def main():
         py = pinyin.strip()
         if not py or not py.isalpha():
             continue
-        zrm = encode_zrm(py)
-        if len(zrm) != 2:
+        zrms = encode_zrm_variants(py)
+        if any(len(z) != 2 for z in zrms):
             # some rare finals (e.g. 'ng', 'm', 'hm') won't reduce to exactly 2 letters; skip gracefully
-            missing.append((char, pinyin, "badzrm:" + zrm))
+            missing.append((char, pinyin, "badzrm:" + repr(zrms)))
             continue
         shp, mode = enc.shape(char)
         stats[mode] = stats.get(mode, 0) + 1
         if not shp:
             missing.append((char, pinyin, "noshape"))
             continue
-        code = zrm + shp
-        out_lines.append("%s\t%s\t%d" % (char, code, boosted_weight(code, weight)))
-        # 双拼码打完(2位)即可作为同音字候选出现，权重按字频排序，
-        # 不必非要把形码也打完才能看到这个字；形码留给需要精确选字的时候用。
-        out_lines.append("%s\t%s\t%d" % (char, zrm, boosted_weight(zrm, weight)))
+        for zrm in zrms:
+            code = zrm + shp
+            out_lines.append("%s\t%s\t%d" % (char, code, boosted_weight(code, weight, char)))
+            # 双拼码打完(2位)即可作为同音字候选出现，权重按字频排序，
+            # 不必非要把形码也打完才能看到这个字；形码留给需要精确选字的时候用。
+            out_lines.append("%s\t%s\t%d" % (char, zrm, boosted_weight(zrm, weight, char)))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")
