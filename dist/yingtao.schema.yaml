@@ -1,0 +1,92 @@
+# Rime schema
+# encoding: utf-8
+
+schema:
+  schema_id: yingtao
+  name: 樱桃音形
+  version: "1.2"
+  author:
+    - 樱桃
+  description: |
+    樱桃音形：自然码双拼 + 98五笔首末字根形码
+    单字全码 = 自然码双拼(2位) + 五笔98首根+末根(2位，不含末笔识别码)
+    二字词 = 前字前两位 + 后字前两位；简码默认三位(前字前两位+后字首位)，
+             二位简码(两字首码)只给同前缀里权重最高的词，避免重码
+    三字词 = 前两字首码 + 第三字前两位；简码 = 三字首码
+    四字词 = 四字首码
+    五字及以上 = 前三字首码 + 末字首码
+    单字权重整体加成，保证和词组撞码时单字优先显示。
+  dependencies:
+    - py
+
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [ 中文, 西文 ]
+  - name: full_shape
+    reset: 0
+    states: [ 半角, 全角 ]
+  - name: simplification
+    reset: 0
+    states: [ 漢字, 汉字 ]
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - reverse_lookup_translator
+    - table_translator
+
+speller:
+  delimiter: " '"
+  alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA
+  initials: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA
+  max_code_length: 4
+  auto_select: true
+  # 只在凑满4位全码时才自动上屏当前排第一的候选（经典五笔"四码顶字"体验）；
+  # 2/3位简码不会被提前打断，可以继续挑候选。
+  auto_select_pattern: "^[a-z]{4}$"
+
+translator:
+  dictionary: yingtao
+  enable_charset_filter: false
+  enable_sentence: true
+  enable_encoder: false
+  enable_completion: true
+  max_phrase_length: 8
+  disable_user_dict_for_patterns:
+    - "^z.*$"
+
+reverse_lookup:
+  dictionary: py
+  prefix: "z"
+  suffix: "'"
+  tips: 〔拼音〕
+  preedit_format:
+    - xform/([nl])v/$1ü/
+    - xform/([jqxy])v/$1u/
+
+punctuator:
+  import_preset: default
+
+key_binder:
+  import_preset: default
+
+recognizer:
+  import_preset: default
+  patterns:
+    reverse_lookup: "^z[a-z]*'?$"

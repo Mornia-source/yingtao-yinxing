@@ -1,0 +1,16 @@
+# Rime dictionary
+# encoding: utf-8
+#
+# 樱桃音形 - 总词典
+# 单字：自然码双拼(2位) + 98五笔首末字根形码(2位) = 4位全码
+# 词组：见 yingtao_chars.dict.yaml / yingtao_words.dict.yaml 内注释说明的取码规则
+#
+---
+name: yingtao
+version: "1.0"
+sort: by_weight
+use_preset_vocabulary: false
+import_tables:
+  - yingtao_chars
+  - yingtao_words
+...
