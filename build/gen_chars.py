@@ -37,7 +37,7 @@ def main():
     enc = ShapeEncoder()
     rows = load_rows()
     out_lines = []
-    stats = {"decomp": 0, "own-full": 0, "own1": 0, "fail": 0}
+    stats = {}
     missing = []
     for char, pinyin, weight in rows:
         # pinyin field may contain multiple syllables separated by space for a single 'char'? For single chars it's one syllable.
@@ -64,7 +64,8 @@ def main():
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")
         f.write("# 樱桃音形 - 单字全码表\n")
         f.write("# 自然码双拼(2位) + 98五笔首末字根形码(2位)\n")
-        f.write("# 数据来源: rime-ice(拼音/字频), lotem/rime-wubi98(官方五笔全码), hanzi-chai/pychai(汉字结构拆分)\n")
+        f.write("# 数据来源: rime-ice(拼音/字频), 用户提供的98五笔去识别码参考表(sources/wubi98_noident_8105.txt，首选)，\n")
+        f.write("# lotem/rime-wubi98 + hanzi-chai/pychai(仅供参考表覆盖不到的极少数生僻字兜底)\n")
         f.write("#\n---\nname: yingtao_chars\nversion: \"1.0\"\nsort: by_weight\n...\n")
         for l in out_lines:
             f.write(l + "\n")

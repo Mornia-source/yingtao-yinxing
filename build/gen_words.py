@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
+# 词组编码完全不涉及形码(见下方 n==2/3/4/5+ 分支)，只需要自然码双拼，
+# 所以这里不需要、也不引入 shape.ShapeEncoder。
 import io, os
-from shape import ShapeEncoder
 from zrm import encode_zrm
 from tier_boost import boosted_weight
 
@@ -10,15 +11,6 @@ _SOURCES = os.path.join(_HERE, "..", "sources")
 SRC = os.path.join(_SOURCES, "base.dict.yaml")
 SRC_CHENGYU = os.path.join(_SOURCES, "chengyu.dict.yaml")
 OUT = os.path.join(_HERE, "yingtao_words.dict.yaml")
-
-_shape_cache = {}
-
-
-def get_shape(enc, ch):
-    if ch not in _shape_cache:
-        code, mode = enc.shape(ch)
-        _shape_cache[ch] = code
-    return _shape_cache[ch]
 
 
 def parse_rows(path):
@@ -58,7 +50,6 @@ def syllables_of(text, packed):
 
 
 def main():
-    enc = ShapeEncoder()
     rows = parse_rows(SRC)
     try:
         rows += parse_rows(SRC_CHENGYU)
