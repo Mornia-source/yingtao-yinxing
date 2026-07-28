@@ -7,6 +7,9 @@ _SOURCES = os.path.join(_HERE, "..", "sources")
 WUBI98_PATH = os.path.join(_SOURCES, "wubi98.dict.yaml")
 PYCHAI_DB = os.path.join(_SOURCES, "pychai_main.sqlite")
 ATOMS_TXT = os.path.join(_HERE, "atoms.txt")
+# User-supplied authoritative reference: 通用规范汉字8105字, 98五笔码已手动去除
+# 末笔识别码，只保留真实字根序列。首选数据源，覆盖率约8104/8139。
+NOIDENT_REF_PATH = os.path.join(_SOURCES, "wubi98_noident_8105.txt")
 
 SUFFIXES = ["变","左","右","上","下","角","内","外","框","底","中","头","旁"]
 MANUAL_FIRST = {"半竹":"t","双折":"n","横斜钩":"g","横日":"g","横钩":"g","竖折":"h"}
@@ -14,9 +17,9 @@ RESOLVED_SUFFIXED_PATH = os.path.join(_HERE, "resolved_suffixed_atoms.json")
 
 # Manually confirmed corrections for specific characters (from user feedback),
 # overriding whatever the general decomposition pipeline would produce.
-CHAR_SHAPE_OVERRIDE = {
-    "是": "jh",
-}
+# ("是" used to need this before the authoritative wubi98_noident_8105.txt
+# reference was supplied; the reference now gives "jh" directly.)
+CHAR_SHAPE_OVERRIDE = {}
 
 
 def load_longest_code():
@@ -80,11 +83,29 @@ def load_tree():
     return {name: (op, f, s) for name, op, f, s in cur.fetchall()}
 
 
+def load_noident_ref():
+    ref = {}
+    try:
+        with io.open(NOIDENT_REF_PATH, encoding="utf-8") as f:
+            for line in f:
+                line = line.rstrip("\r\n")
+                parts = line.split("\t")
+                if len(parts) != 2:
+                    continue
+                ch, code = parts
+                if len(ch) == 1 and code.isalpha() and code.islower():
+                    ref[ch] = code
+    except IOError:
+        pass
+    return ref
+
+
 class ShapeEncoder:
     def __init__(self):
         self.longest_code = load_longest_code()
         self.atom_first = load_atom_first(self.longest_code)
         self.tree = load_tree()
+        self.noident_ref = load_noident_ref()
         sys.setrecursionlimit(10000)
 
     def leaves(self, name, depth=0, seen=None):
@@ -102,9 +123,15 @@ class ShapeEncoder:
         return self.leaves(f, depth + 1, seen) + self.leaves(s, depth + 1, seen)
 
     def shape(self, char):
-        """Returns (code, mode) where mode in {decomp, own-full, own1, fail, override}"""
+        """Returns (code, mode) where mode in
+        {ref, decomp, own-full, own1, fail, override}"""
         if char in CHAR_SHAPE_OVERRIDE:
             return CHAR_SHAPE_OVERRIDE[char], "override"
+        root_code = self.noident_ref.get(char)
+        if root_code:
+            if len(root_code) == 1:
+                return root_code[0] + root_code[0], "ref"
+            return root_code[0] + root_code[-1], "ref"
         ls = self.leaves(char)
         if len(ls) >= 2:
             fk = self.atom_first.get(ls[0])

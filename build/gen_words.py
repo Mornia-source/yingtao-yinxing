@@ -65,7 +65,6 @@ def main():
         pass
 
     out = []  # list of (text, code, weight)
-    two_char_candidates = []  # (text, code3, code2, weight) pending collision resolution
     skipped = 0
     for text, packed, weight in rows:
         n = len(text)
@@ -91,13 +90,13 @@ def main():
             continue
 
         if n == 2:
-            # 全码：前字前两位+后字前两位
+            # 全码：前字前两位+后字前两位；简码：前字前两位+后字首位（3位）。
+            # 2位编码专属于单字双拼(见gen_chars.py)，词组一律从3位起，
+            # 避免和"双拼2位打完优先显示单字"的规则冲突。
             full = zrms[0] + zrms[1]
+            short = zrms[0][0] + zrms[0][1] + firsts[1]
             out.append((text, full, weight))
-            # 简码默认三位（前字前两位+后字首位），二位简码仅给同前缀里权重最高的词，避免重码
-            code3 = zrms[0][0] + zrms[0][1] + firsts[1]
-            code2 = firsts[0] + firsts[1]
-            two_char_candidates.append((text, code3, code2, weight))
+            out.append((text, short, weight))
         elif n == 3:
             full = firsts[0] + firsts[1] + zrms[2]
             short = firsts[0] + firsts[1] + firsts[2]
@@ -109,19 +108,6 @@ def main():
         else:
             code = firsts[0] + firsts[1] + firsts[2] + firsts[-1]
             out.append((text, code, weight))
-
-    # 三位简码：始终收录（默认方案）
-    for text, code3, code2, weight in two_char_candidates:
-        out.append((text, code3, weight))
-
-    # 二位简码：每个二位编码前缀只保留权重最高的一个词，避免重码
-    best_by_code2 = {}
-    for text, code3, code2, weight in two_char_candidates:
-        cur = best_by_code2.get(code2)
-        if cur is None or weight > cur[1]:
-            best_by_code2[code2] = (text, weight)
-    for code2, (text, weight) in best_by_code2.items():
-        out.append((text, code2, weight))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")
