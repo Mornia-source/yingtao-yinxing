@@ -33,10 +33,27 @@
 
 ## 数据来源与生成方法
 
+**单字**
+
 - **98五笔字根参考（去末笔识别码）**：用户自行整理的"通用规范汉字8105字"参考表，每个字对应的98五笔码已手动去掉末笔识别码、只保留真实字根序列，是单字形码的首选数据源（`sources/wubi98_noident_8105.txt`）。
-- 拼音数据、字频、词库：[iDvel/rime-ice](https://github.com/iDvel/rime-ice)（8105 常用字表 + 基础词库 + 成语词库）。
+- 单字的拼音与字频：[iDvel/rime-ice](https://github.com/iDvel/rime-ice) 的 8105 常用字表。
 - 官方98五笔全码：[lotem/rime-wubi98](https://github.com/lotem/rime-wubi98)、汉字结构拆分：[hanzi-chai/pychai](https://github.com/hanzi-chai/pychai) —— 仅作为上面参考表覆盖不到的极少数生僻字（约32个）的备用近似算法。
-- `../build/` 目录下的 Python 脚本（`shape.py` 形码计算、`zrm.py` 自然码双拼算法、`gen_chars.py`/`gen_words.py` 生成码表）可重新运行以更新/扩展码表；`../sources/` 存放了脚本依赖的原始数据快照。
+
+**词组**（v2.0 起换用 openfly 词表重建）
+
+- **词表**：[amorphobia/openfly](https://github.com/amorphobia/openfly)（词库开源的小鹤音形 Rime 配方）的 `primary`(首选) / `secondary`(次选) 词表，约 5.3 万条精选多字词。**只取「词本身」和它所在的层级，小鹤自己的编码一概不用**——樱桃音形的编码全部由本文档「编码规则」一节的规则现算。
+- **注音**：[pypinyin](https://github.com/mozillazg/python-pinyin)，按整词注音，能正确区分多音字（银行 yin-hang、重庆 chong-qing、会计 kuai-ji、音乐 yin-yue 均已验证）。
+- **词频**：openfly **没有任何词频/权重字段**（15 个词典文件全部只有「词 + 小鹤编码」两列，优先级靠文件分层和行序表达，而那个行序是按小鹤自己的编码排的，对我们没用）。所以 rime-ice 的 `base`/`chengyu` 词库降级为**只查词频的辅助表**，不再决定收录哪些词。openfly 的词有 90.2% 能在 rime-ice 里查到词频，剩下约 5000 条给一个偏低的默认值（100，约等于 rime-ice 词频的下四分位），保证能打出来但不会盖过真正的常用词。次选词整体再乘 0.3 降权，体现 openfly 的 primary/secondary 分层。
+
+**生成脚本**
+
+`../build/` 下的 Python 脚本可重新运行以更新码表：`shape.py`（形码计算）、`zrm.py`（自然码双拼算法）、`tier_boost.py`（码长分档权重）、`gen_chars.py` / `gen_words.py`（生成码表）。`../sources/` 存放脚本依赖的原始数据快照。
+
+生成词库需要 pypinyin：
+
+```bash
+pip install pypinyin
+```
 
 ## 已知局限
 
@@ -57,4 +74,25 @@
 - `speller/auto_select: true` + `auto_select_pattern: "^[a-z]{4}$"`：只有凑满4位编码时才会自动把当前排名第一的候选上屏（经典五笔"四码顶字"手感）；2位、3位的简码不会被提前打断，可以继续挑候选或续打。
 - 三个开关（中西文、半全角、繁简）都加了 `reset: 0`，避免继承别的方案里的全角/繁体状态，导致回车提交出来的字母变成全角。
 
-另外，词库来源 rime-ice 是通用词库，个别口语化短语（如"手头紧"）可能没收录，可以自己在 `yingtao_words.dict.yaml` 里按同样规则追加。
+## 中文标点
+
+标点映射直接写死在 `yingtao.schema.yaml` 的 `punctuator` 段里，不再 `import_preset`——因为同一个 Rime 用户目录下别的方案（wubi98_ci 等）共用 `punctuation.yaml`，写死可以避免互相干扰。
+
+中文模式（`half_shape`）下符号键的输出：
+
+| 键 | 输出 | 键 | 输出 | 键 | 输出 |
+|---|---|---|---|---|---|
+| `!` | ！ | `$` | ￥ | `^` | …… |
+| `(` `)` | （） | `_` | —— | `[` `]` | 「」（可翻页选【】） |
+| `\` | 、 | `:` | ： | `;` | ； |
+| `'` | ‘’ | `"` | “” | `<` `>` | 《》 |
+| `,` | ， | `.` | 。 | `?` | ？ |
+| `/` | 、 | `{` `}` | 『』 | | |
+
+`@ # % & * - + = |` 保持原样输出半角，符合中文写作里这些符号本来就用半角的习惯。切到西文模式（`ascii_style`）时全部输出半角原字符。
+
+## 待办
+
+「先按 `;` 再按 `i` 快速删除刚上屏的内容、`;;` 或 `;`+回车输入字面分号」这个功能还没做——它需要新写一个按键处理器（processor），比候选过滤器复杂、风险也更高，留待后续。目前 `;` 直接上屏 ；。
+
+另外，个别口语化短语（如"手头紧"）词库里可能没收录，可以自己在 `yingtao_words.dict.yaml` 里按同样规则追加。
