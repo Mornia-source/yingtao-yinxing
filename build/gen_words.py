@@ -98,33 +98,38 @@ def load_words():
     return list(seen.values())
 
 
-def codes_for(text, zrm_variants, firsts, shapes=None):
+def codes_for(text, zrm_variants, firsts, tail_shapes=None):
     """按樱桃音形规则返回该词的全部编码。
 
-    shapes 只在双字词用到：(字1首根, 字2首根)，用来发 6 码精确码。
+    tail_shapes = (倒数第二字首字根, 末字首字根)，用来在 4 码全码之后
+    再发一条 6 码精确码。所有词长统一「取最后两个字的首字根」——双字词
+    正好就是它自己的两个字，规则完全一致。
     """
     n = len(text)
     out = []
+    fulls = []
     if n == 2:
         # 简码 = 前字前两位 + 后字首位（3位）
         # 全码 = 前字前两位 + 后字前两位（4位）
-        # 精确码 = 全码 + 字1首字根 + 字2首字根（6位），给4码撞车时用。
         # 2位编码专属于单字双拼（见 gen_chars.py），词组一律从3位起。
         for z0 in zrm_variants[0]:
             for z1 in zrm_variants[1]:
-                full = z0 + z1
-                out.append(full)
-                if shapes:
-                    out.append(full + shapes[0] + shapes[1])
+                fulls.append(z0 + z1)
             out.append(z0 + firsts[1])
     elif n == 3:
+        # 简码 = 三字首码（3位）；全码 = 前两字首码 + 第三字前两位（4位）
         out.append(firsts[0] + firsts[1] + firsts[2])
         for z2 in zrm_variants[2]:
-            out.append(firsts[0] + firsts[1] + z2)
+            fulls.append(firsts[0] + firsts[1] + z2)
     elif n == 4:
-        out.append("".join(firsts))
+        fulls.append("".join(firsts))
     else:
-        out.append(firsts[0] + firsts[1] + firsts[2] + firsts[-1])
+        fulls.append(firsts[0] + firsts[1] + firsts[2] + firsts[-1])
+
+    out.extend(fulls)
+    if tail_shapes:
+        for full in fulls:
+            out.append(full + tail_shapes[0] + tail_shapes[1])
     return out
 
 
@@ -150,24 +155,24 @@ def main():
             skipped += 1
             continue
 
-        shapes = None
-        if len(text) == 2:
-            s = []
-            for c in text:
-                if c not in shape_cache:
-                    shape_cache[c] = (enc.shape(c)[0] or "")
-                s.append(shape_cache[c])
-            if s[0] and s[1]:
-                shapes = (s[0][0], s[1][0])  # 各取首字根
+        # 扩展码用「最后两个字的首字根」，所有词长统一
+        tail_shapes = None
+        s = []
+        for c in text[-2:]:
+            if c not in shape_cache:
+                shape_cache[c] = (enc.shape(c)[0] or "")
+            s.append(shape_cache[c])
+        if s[0] and s[1]:
+            tail_shapes = (s[0][0], s[1][0])
 
-        for code in codes_for(text, zrm_variants, firsts, shapes):
+        for code in codes_for(text, zrm_variants, firsts, tail_shapes):
             out.append((text, code, weight))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")
         f.write("# 樱桃音形 - 词组码表（二字词/三字词/四字词/多字词）\n")
         f.write("# 词表/注音/词频来源: rime-ice 雾凇拼音 基础词库\n")
-        f.write("# 双字词除3码简码/4码全码外，另有6码=全码+字1首根+字2首根，供4码撞车时精确定位\n")
+        f.write("# 各词长除简码/全码外，另有6码=全码+最后两个字的首字根，供4码撞车时精确定位\n")
         f.write("#\n---\nname: yingtao_words\nversion: \"3.0\"\nsort: by_weight\n...\n")
         for text, code, weight in out:
             f.write("%s\t%s\t%d\n" % (text, code, boosted_weight(code, weight, text)))

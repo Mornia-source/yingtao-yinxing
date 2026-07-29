@@ -1,4 +1,5 @@
--- 樱桃音形专用过滤器：候选队列前段按权重(quality)从高到低重排。
+-- 樱桃音形专用过滤器：候选队列前段先按「字数少的优先」、同字数内再按
+-- 权重(quality)从高到低重排。
 --
 -- 起因：Rime 的补全(completion)候选是按编码本身在字根树里的顺序枚举
 -- 出来的，不是全局按词频/权重排序的；tier_boost.py 已经把"编码位数越少
@@ -25,22 +26,29 @@ local function sorted_or_original(buf)
     if n <= 1 then return buf end
 
     local quality = {}
+    local length = {}
     for i = 1, n do
         local q = buf[i].quality
         if type(q) ~= "number" then
             return buf -- 取不到有效权重，原样透传，不冒险排序
         end
         quality[i] = q
+        length[i] = utf8.len(buf[i].text) or 99
     end
 
     local idx = {}
     for i = 1, n do idx[i] = i end
 
     local ok = pcall(table.sort, idx, function(a, b)
+        -- 第一优先级：字数少的排前面，绝对生效，不给"全码精确匹配"开口子。
+        if length[a] ~= length[b] then
+            return length[a] < length[b]
+        end
+        -- 同字数内再按权重（已含码长分档加成）排。
         if quality[a] ~= quality[b] then
             return quality[a] > quality[b]
         end
-        return a < b -- 权重相同时保持原有先后顺序，做稳定排序
+        return a < b -- 权重也相同时保持原有先后顺序，做稳定排序
     end)
     if not ok then
         return buf

@@ -1,0 +1,55 @@
+# Rime schema
+# encoding: utf-8
+#
+# 这个方案只是个「壳」，作用是让 Rime 把 wubi98.dict.yaml 编译出来，
+# 供樱桃音形的「/ 引导 98 五笔反查」使用。
+# 它不需要出现在 default.custom.yaml 的 schema_list 里——樱桃音形的
+# schema/dependencies 写了 wubi98，部署时会自动把它当依赖一起编译。
+# （dependencies 里只能写方案 id，直接写词典名是不会被编译的。）
+
+schema:
+  schema_id: wubi98
+  name: 五笔98·反查
+  version: "0.2"
+  author:
+    - 發明人 王永民先生
+  description: |
+    碼表源自 lotem/rime-wubi98（ibus-table 转写）。
+    仅作樱桃音形的反查词典使用。
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - table_translator
+
+speller:
+  delimiter: " ;'"
+  max_code_length: 4
+
+translator:
+  dictionary: wubi98
+  enable_charset_filter: false
+  enable_sentence: false
+  enable_encoder: false
+  enable_user_dict: false
+
+punctuator:
+  import_preset: default
+
+key_binder:
+  import_preset: default

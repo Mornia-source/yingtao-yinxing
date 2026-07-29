@@ -4,22 +4,23 @@
 schema:
   schema_id: yingtao
   name: 樱桃音形
-  version: "1.2"
+  version: "3.0"
   author:
     - 樱桃
   description: |
     樱桃音形：自然码双拼 + 98五笔首末字根形码
     单字 = 自然码双拼(2位) + 五笔98首根+末根(2位，不含末笔识别码)；
-           另附一条纯双拼(2位)简码，双拼一打完就能看到同音字候选
-    二字词 = 前字前两位 + 后字前两位；简码 = 前字前两位+后字首位(3位)
-    三字词 = 前两字首码 + 第三字前两位；简码 = 三字首码
-    四字词 = 四字首码
-    五字及以上 = 前三字首码 + 末字首码
-    候选编码位数越少优先级越高(2位单字>3位简码>4位全码)，同位数内按词频排序；
-    另有lua过滤器把候选队列前段的单字提到词/句前面，弥补补全候选按
-    字根树顺序枚举、不完全跟随词频排序的问题。
+           另附一条纯双拼(2位)简码；26个单键有硬性首选字
+    二字词 = 简码 前字前两位+后字首位(3位)；全码 前字前两位+后字前两位(4位)
+    三字词 = 简码 三字首码(3位)；全码 前两字首码+第三字前两位(4位)
+    四字词 = 四字首码(4位)
+    五字及以上 = 前三字首码 + 末字首码(4位)
+    以上各词长在 4 位全码之后都可再打 2 位形码(最后两个字的首字根)精确定位。
+    候选排序：字数少的绝对优先，同字数内按权重(码长分档+词频)排。
+    临时反查：` 引导全拼，/ 引导98五笔。
   dependencies:
     - py
+    - wubi98
 
 switches:
   - name: ascii_mode
@@ -50,7 +51,8 @@ engine:
     - fallback_segmentor
   translators:
     - punct_translator
-    - reverse_lookup_translator
+    - reverse_lookup_translator@pinyin_lookup
+    - reverse_lookup_translator@wubi_lookup
     - table_translator
   filters:
     # 引用格式必须是 *文件名*函数名——这个 librime 构建要求 lua 模块
@@ -89,17 +91,26 @@ translator:
   # 只留下提示码本身。
   comment_format:
     - "xform/^~//"
-  disable_user_dict_for_patterns:
-    - "^z.*$"
 
-reverse_lookup:
+# 两个临时反查。注意前缀都用非字母键：本方案 26 个字母全是有效码位，
+# 用字母当前缀会把该字母开头的编码整片吞掉（原来用 z 引导拼音反查，
+# 结果咋/砸/杂/在/最/走 等 417 条 z 开头的编码全都打不出来）。
+# 反查模式要求前缀后至少跟一个字母，所以单独敲 ` 或 / 仍然出标点。
+pinyin_lookup:
+  tag: pinyin_lookup
   dictionary: py
-  prefix: "z"
+  prefix: "`"
   suffix: "'"
-  tips: 〔拼音〕
+  tips: 〔全拼〕
   preedit_format:
     - xform/([nl])v/$1ü/
     - xform/([jqxy])v/$1u/
+
+wubi_lookup:
+  tag: wubi_lookup
+  dictionary: wubi98
+  prefix: "/"
+  tips: 〔五笔98〕
 
 # 标点直接写死在方案里，不 import_preset——避免和同一份 Rime 用户目录下
 # 别的方案（wubi98_ci 等）共用 punctuation.yaml 时互相干扰。
@@ -212,4 +223,5 @@ key_binder:
 recognizer:
   import_preset: default
   patterns:
-    reverse_lookup: "^z[a-z]*'?$"
+    pinyin_lookup: "^`[a-z]+'?$"
+    wubi_lookup: "^/[a-z]+$"
