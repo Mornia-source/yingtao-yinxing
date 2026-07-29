@@ -27,9 +27,16 @@
    - `yingtao.dict.yaml`
    - `yingtao_chars.dict.yaml`
    - `yingtao_words.dict.yaml`
-   - `lua/char_priority.lua`（复制到用户目录下的 `lua` 子文件夹，没有就新建）
+   - `lua/char_priority.lua`、`lua/semicolon_delete.lua`（复制到用户目录下的 `lua` 子文件夹，没有就新建）
    - `wubi98.schema.yaml` + `wubi98.dict.yaml`（供 `/` 五笔反查用；它不必加进 `schema_list`，樱桃音形的 `dependencies` 会带着它一起编译）
-3. 编辑用户目录下的 `default.custom.yaml`（没有就新建），加入：
+3. **注册分号快捷删除功能**：编辑用户目录下的 `rime.lua`（这是 Weasel 全局共享的文件，不在本仓库里，需要手动加一行）。在已有的 `switch_processor = require("switcher")` 附近加入一行：
+
+   ```lua
+   semicolon_delete_processor = require("semicolon_delete")
+   ```
+
+   **注意**：这个功能必须以全局变量的方式注册在 `rime.lua` 里，再用 `lua_processor@semicolon_delete_processor`（变量名）引用。`lua_processor@*文件名*函数名` 这种写法只对 `lua_filter` 有效，对 `lua_processor` 无效——实测会导致每次按键都报错（`func type: nil` / `attempt to call a nil value`），整个输入法完全没法用。如果只想要单字/词表功能、不需要分号删除，跳过这一步，并把 `yingtao.schema.yaml` 里 `lua_processor@semicolon_delete_processor` 那一行删掉即可。
+4. 编辑用户目录下的 `default.custom.yaml`（没有就新建），加入：
 
    ```yaml
    patch:
@@ -37,7 +44,7 @@
        - schema: yingtao
    ```
 
-4. 右键托盘图标"重新部署"。**注意**：小狼毫的"重新部署"只会重新编译码表文件，正在运行的 WeaselServer 进程不一定会重新加载编译结果；如果部署后候选看起来还是旧的，需要手动重启一次 WeaselServer 进程（或注销/重启电脑）。
+5. 右键托盘图标"重新部署"。**注意**：小狼毫的"重新部署"只会重新编译码表文件，正在运行的 WeaselServer 进程不一定会重新加载编译结果；如果部署后候选看起来还是旧的，需要手动重启一次 WeaselServer 进程（或注销/重启电脑）。
 
 ## 数据来源与生成方法
 
@@ -162,8 +169,17 @@ pip install pypinyin
 
 `@ # % & * - + = |` 保持原样输出半角，符合中文写作里这些符号本来就用半角的习惯。切到西文模式（`ascii_style`）时全部输出半角原字符。
 
+## 分号快捷键
+
+打完字后，单独按一下 `;`（不接其它字符输入时）会先被吞掉、不上屏，等下一个键决定做什么：
+
+- 接 `i`：撤回上一次上屏的全部内容（不管上次上屏了几个字），靠连续退格实现。
+- 接 `;` 或回车：把等待中的分号真正打出来（字面 `；`/`;`，取决于中西文模式和全半角）。
+- 接其它任意键：先把等待中的分号原样打出来，再正常处理这个键。
+
+正在打字（候选还没上屏）时分号完全不受影响，照常当标点或输入用。这个功能靠 `lua/semicolon_delete.lua` 实现，需要按上面「安装方法」第3步手动在 `rime.lua` 里注册才能生效。
+
 ## 待办
 
-- 「先按 `;` 再按 `i` 快速删除刚上屏的内容、`;;` 或 `;`+回车输入字面分号」还没做——需要新写一个按键处理器（processor），比候选过滤器复杂、风险也更高。目前 `;` 直接上屏 ；。
 - **6位精确码的调频没有反哺回4位全码**：Rime 的自适应调频（user_dict）是按"实际打的那串编码"记学习值的，打6码选中的词，学到的频率只会提升它自己在6码下的排位，不会传导到4码。要做到"这次用6码选了'添加'，下次打4码'tmjw'时'添加'也排到'晪'前面"，需要额外写一个 lua 处理器：拦截提交事件，把6码精确码的选择计数按去掉最后2位形码的规则映射记到4码上，再让排序读取这份计数。同样是新增有一定风险的 lua 组件，还没做。
 - 个别词如果没收录，可以自己在 `yingtao_words.dict.yaml` 里按同样规则追加。
