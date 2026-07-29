@@ -2,7 +2,7 @@
 import io, os
 from shape import ShapeEncoder
 from zrm import encode_zrm, encode_zrm_variants
-from tier_boost import boosted_weight
+from tier_boost import boosted_weight, SINGLE_KEY_CHARS
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _SOURCES = os.path.join(_HERE, "..", "sources")
@@ -39,6 +39,7 @@ def main():
     out_lines = []
     stats = {}
     missing = []
+    char_weight = {}  # 字 -> 字频，供单键硬性首选复用
     for char, pinyin, weight in rows:
         # pinyin field may contain multiple syllables separated by space for a single 'char'? For single chars it's one syllable.
         py = pinyin.strip()
@@ -60,6 +61,16 @@ def main():
             # 双拼码打完(2位)即可作为同音字候选出现，权重按字频排序，
             # 不必非要把形码也打完才能看到这个字；形码留给需要精确选字的时候用。
             out_lines.append("%s\t%s\t%d" % (char, zrm, boosted_weight(zrm, weight, char)))
+        char_weight[char] = weight
+
+    # 单键硬性首选：给这26个字各发一条1位编码的词条，权重档位压过一切补全候选。
+    single_key_missing = []
+    for key, ch in sorted(SINGLE_KEY_CHARS.items()):
+        w = char_weight.get(ch)
+        if w is None:
+            single_key_missing.append((key, ch))
+            w = 0
+        out_lines.append("%s\t%s\t%d" % (ch, key, boosted_weight(key, w, ch)))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")
@@ -75,6 +86,8 @@ def main():
     print("written:", len(out_lines))
     print("missing:", len(missing))
     print("shape stats:", stats)
+    print("single-key entries:", len(SINGLE_KEY_CHARS),
+          "not found in char table:", single_key_missing)
     print("missing sample:", missing[:30])
 
 
