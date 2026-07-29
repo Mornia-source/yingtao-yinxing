@@ -1,12 +1,17 @@
--- 樱桃音形专用过滤器：候选队列前段先按「字数少的优先」、同字数内再按
--- 权重(quality)从高到低重排。
+-- 樱桃音形专用过滤器：候选队列前段重排，优先级从高到低：
+--   1. 全码精确匹配的候选（当前已经打的编码正好是它自己的编码，不用再
+--      多打字就能选中）——按 quality 排，不受字数限制。
+--   2. 其余候选（还需要多打字才能补全，比如4码全码打完时冒出来的
+--      6码精确码提示）——先按字数少的优先，同字数内再按 quality 排。
+-- "精确匹配"用 cand.comment 是否为空来判断：table_translator 只在
+-- 候选需要补全时才会给 comment 挂上剩余编码提示，精确匹配的候选
+-- comment 天生是空的，不用额外传参数、也不用去猜当前输入长度。
 --
 -- 起因：Rime 的补全(completion)候选是按编码本身在字根树里的顺序枚举
 -- 出来的，不是全局按词频/权重排序的；tier_boost.py 已经把"编码位数越少
 -- 权重越高"这条规则揉进了词典权重(2位单字 > 3位简码 > 4位全码，同位数
--- 内再按词频)，只要把候选按quality重新排一遍，"字优先于词""位数少的
--- 优先""同位数内更常用的优先"这几条规则就都自然满足了，不需要再单独
--- 判断文本是不是单字、是不是精确匹配。
+-- 内再按词频)，配合这里的重排，"字优先于词""位数少的优先""同位数内
+-- 更常用的优先""全码精确匹配的例外"这几条规则就都能满足。
 --
 -- 之前直接用 table.sort(cands, function(a,b) return a.quality>b.quality end)
 -- 上过一次线，结果把候选顺序搞得更乱——推测是候选里混入了quality不是
@@ -27,6 +32,7 @@ local function sorted_or_original(buf)
 
     local quality = {}
     local length = {}
+    local exact = {}
     for i = 1, n do
         local q = buf[i].quality
         if type(q) ~= "number" then
@@ -34,17 +40,30 @@ local function sorted_or_original(buf)
         end
         quality[i] = q
         length[i] = utf8.len(buf[i].text) or 99
+        local c = buf[i].comment
+        exact[i] = (c == nil or c == "")
     end
 
     local idx = {}
     for i = 1, n do idx[i] = i end
 
     local ok = pcall(table.sort, idx, function(a, b)
-        -- 第一优先级：字数少的排前面，绝对生效，不给"全码精确匹配"开口子。
+        -- 第一优先级：全码精确匹配的候选整体排在需要继续补全的候选前面。
+        if exact[a] ~= exact[b] then
+            return exact[a]
+        end
+        if exact[a] then
+            -- 都是精确匹配：不受字数限制，直接按权重比，让"全码精确
+            -- 匹配"真正例外于"字数少优先"这条规则。
+            if quality[a] ~= quality[b] then
+                return quality[a] > quality[b]
+            end
+            return a < b
+        end
+        -- 都是补全候选：字数少的排前面，同字数内再按权重排。
         if length[a] ~= length[b] then
             return length[a] < length[b]
         end
-        -- 同字数内再按权重（已含码长分档加成）排。
         if quality[a] ~= quality[b] then
             return quality[a] > quality[b]
         end

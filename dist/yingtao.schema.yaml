@@ -16,8 +16,8 @@ schema:
     四字词 = 四字首码(4位)
     五字及以上 = 前三字首码 + 末字首码(4位)
     以上各词长在 4 位全码之后都可再打 2 位形码(最后两个字的首字根)精确定位。
-    候选排序：字数少的绝对优先，同字数内按权重(码长分档+词频)排。
-    临时反查：` 引导全拼，/ 引导98五笔。
+    候选排序：字数少的优先，全码精确匹配的候选例外，同字数内按权重排。
+    临时反查：z 引导全拼，/ 引导98五笔。
   dependencies:
     - py
     - wubi98
@@ -92,14 +92,13 @@ translator:
   comment_format:
     - "xform/^~//"
 
-# 两个临时反查。注意前缀都用非字母键：本方案 26 个字母全是有效码位，
-# 用字母当前缀会把该字母开头的编码整片吞掉（原来用 z 引导拼音反查，
-# 结果咋/砸/杂/在/最/走 等 417 条 z 开头的编码全都打不出来）。
-# 反查模式要求前缀后至少跟一个字母，所以单独敲 ` 或 / 仍然出标点。
+# 拼音反查放回 z（实测 table_translator 和 reverse_lookup_translator
+# 会同时给出候选，z开头的正常编码不会被吞掉，配合权重分档该赢的还是赢，
+# 不是理论上担心的那种冲突）。五笔反查因为没有先例验证，仍用非字母的 /。
 pinyin_lookup:
   tag: pinyin_lookup
   dictionary: py
-  prefix: "`"
+  prefix: "z"
   suffix: "'"
   tips: 〔全拼〕
   preedit_format:
@@ -223,5 +222,5 @@ key_binder:
 recognizer:
   import_preset: default
   patterns:
-    pinyin_lookup: "^`[a-z]+'?$"
+    pinyin_lookup: "^z[a-z]*'?$"
     wubi_lookup: "^/[a-z]+$"
