@@ -75,6 +75,9 @@ speller:
   # 4 码撞车 → 不上屏，可以继续打 2 位形码精确定位；6 码唯一 → 上屏。
   auto_select_pattern: "^[a-z]{4}$|^[a-z]{6}$"
 
+menu:
+  page_size: 6
+
 translator:
   dictionary: yingtao
   enable_charset_filter: false
@@ -82,6 +85,10 @@ translator:
   enable_encoder: false
   enable_completion: true
   max_phrase_length: 8
+  # 补全候选的注释默认长这样：~剩余编码。这里把开头的 ~ 去掉，
+  # 只留下提示码本身。
+  comment_format:
+    - "xform/^~//"
   disable_user_dict_for_patterns:
     - "^z.*$"
 
