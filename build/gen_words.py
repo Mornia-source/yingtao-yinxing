@@ -15,6 +15,7 @@
 import io, os
 from pypinyin import lazy_pinyin, Style
 
+from shape import ShapeEncoder
 from zrm import encode_zrm_variants
 from tier_boost import boosted_weight
 
@@ -37,6 +38,11 @@ OUT = os.path.join(_HERE, "yingtao_words.dict.yaml")
 DEFAULT_FREQ = 100
 # 次选词整体降权，体现 openfly 里 primary/secondary 的分层。
 TIER_FACTOR = {0: 1.0, 1: 0.3}
+
+# 在 openfly 词表之外，额外补收雾凇里词频达标的双字词。
+# 实测 4 码唯一率：只用 openfly 93.4%(最大重码3)；加 >=2000 后 88.0%(最大重码9，
+# 一页仍装得下)；加 >=1000 掉到 81.7%；全量加会崩到 25.7%(最大重码34)。
+EXTRA_2CHAR_MIN_FREQ = 2000
 
 
 def _is_cjk(ch):
@@ -105,16 +111,40 @@ def load_words():
     return words
 
 
-def codes_for(text, zrm_variants, firsts):
-    """按樱桃音形规则返回该词的全部编码。"""
+def add_extra_2char(words, freq):
+    """在 openfly 之外补收雾凇里词频达标的双字词，标为首选层。"""
+    added = 0
+    for text, w in freq.items():
+        if len(text) != 2 or w < EXTRA_2CHAR_MIN_FREQ:
+            continue
+        if not all(_is_cjk(c) for c in text):
+            continue
+        if text not in words:
+            words[text] = 0
+            added += 1
+    return added
+
+
+def codes_for(text, zrm_variants, firsts, shapes=None):
+    """按樱桃音形规则返回该词的全部编码。
+
+    shapes 只在双字词用到：(字1首根, 字2首根)，用来发 6 码精确码。
+    """
     n = len(text)
     out = []
     if n == 2:
         # 全码 = 前字前两位 + 后字前两位；简码 = 前字前两位 + 后字首位（3位）。
         # 2位编码专属于单字双拼（见 gen_chars.py），词组一律从3位起。
+        # 6码 = 全码 + 字1首字根 + 字2首字根，给4码撞车时精确定位用。
+        # 实测(雾凇全量12.4万双字词)唯一率：4码25.7% → 6码93.5%；
+        # 「字1首根+字2首根」优于「字1首根+字2末根」(91.7%)和
+        # 「字1末根+字2末根」(89.0%)，而且两个字都取首根，规则更统一好记。
         for z0 in zrm_variants[0]:
             for z1 in zrm_variants[1]:
-                out.append(z0 + z1)
+                full = z0 + z1
+                out.append(full)
+                if shapes:
+                    out.append(full + shapes[0] + shapes[1])
             out.append(z0 + firsts[1])
     elif n == 3:
         out.append(firsts[0] + firsts[1] + firsts[2])
@@ -128,12 +158,16 @@ def codes_for(text, zrm_variants, firsts):
 
 
 def main():
+    enc = ShapeEncoder()
     freq = load_freq()
     words = load_words()
+    n_openfly = len(words)
+    n_extra = add_extra_2char(words, freq)
 
     out = []
     skipped_pinyin = 0
     no_freq = 0
+    no_shape = 0
     for text, tier in words.items():
         syls = lazy_pinyin(text, style=Style.NORMAL, v_to_u=False, errors="ignore")
         if len(syls) != len(text):
@@ -160,22 +194,36 @@ def main():
             no_freq += 1
         w = int(w * TIER_FACTOR.get(tier, 1.0)) or 1
 
-        for code in codes_for(text, zrm_variants, firsts):
+        shapes = None
+        if len(text) == 2:
+            s1, _ = enc.shape(text[0])
+            s2, _ = enc.shape(text[1])
+            if s1 and s2:
+                shapes = (s1[0], s2[0])  # 各取首字根
+            else:
+                no_shape += 1
+
+        for code in codes_for(text, zrm_variants, firsts, shapes):
             out.append((text, code, w))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")
         f.write("# 樱桃音形 - 词组码表（二字词/三字词/四字词/多字词）\n")
         f.write("# 词表来源: openfly 开源小鹤音形词库(只取词与层级，不用其编码)\n")
+        f.write("#           + rime-ice 里词频>=%d 的双字词\n" % EXTRA_2CHAR_MIN_FREQ)
+        f.write("# 双字词除3码简码/4码全码外，另有6码=全码+字1首根+字2首根，供4码撞车时精确定位\n")
         f.write("# 注音来源: pypinyin(按词注音，正确处理多音字)\n")
         f.write("# 词频来源: rime-ice base/chengyu 词库(仅作词频查询)\n")
         f.write("#\n---\nname: yingtao_words\nversion: \"2.0\"\nsort: by_weight\n...\n")
         for text, code, weight in out:
             f.write("%s\t%s\t%d\n" % (text, code, boosted_weight(code, weight, text)))
 
-    print("openfly words:", len(words))
+    print("openfly words:", n_openfly,
+          "+ extra 2-char (freq>=%d):" % EXTRA_2CHAR_MIN_FREQ, n_extra,
+          "= total", len(words))
     print("skipped (pinyin mismatch):", skipped_pinyin)
     print("no freq in rime-ice (used default):", no_freq)
+    print("2-char without shape code (no 6-code):", no_shape)
     print("written entries:", len(out))
 
 

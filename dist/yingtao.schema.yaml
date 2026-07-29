@@ -57,16 +57,23 @@ engine:
     # 返回 {函数名 = 函数} 的表，写成 lua_filter@char_priority 会报
     # "func type: nil"，整条候选链会崩掉、完全打不出字。
     - lua_filter@*char_priority*Char_priority_filter
+    # 双字词同时有 4 码和 6 码词条，打 4 码时它自己的 6 码会作为补全候选
+    # 再冒出来一次，这里去重。放在排序之后，保证留下的是权重高的那条。
+    - uniquifier
 
 speller:
   delimiter: " '"
   alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA
   initials: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA
-  max_code_length: 4
+  # 抬到 6 是为了让双字词的 6 码精确码打得出来。librime 里
+  # AutoSelectAtMaxCodeLength 会在候选码长达到 max_code_length 时直接确认
+  # 当前选中项（不管有几个候选），如果这里还是 4，第 5、6 码根本没机会输入。
+  max_code_length: 6
   auto_select: true
-  # 只在凑满4位全码时才自动上屏当前排第一的候选（经典五笔"四码顶字"体验）；
-  # 2/3位简码不会被提前打断，可以继续挑候选。
-  auto_select_pattern: "^[a-z]{4}$"
+  # AutoSelectUniqueCandidate 要求「候选恰好只有 1 个」才自动上屏，
+  # 所以这条规则的实际效果是：4 码唯一 → 直接上屏（本来也不需要 6 码）；
+  # 4 码撞车 → 不上屏，可以继续打 2 位形码精确定位；6 码唯一 → 上屏。
+  auto_select_pattern: "^[a-z]{4}$|^[a-z]{6}$"
 
 translator:
   dictionary: yingtao
