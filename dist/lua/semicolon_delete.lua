@@ -1,14 +1,16 @@
 -- 樱桃音形专用处理器：分号(;)的两段式功能。
 --   闲置状态(没有正在composing)下先按一次 ; ：吞掉、不上屏，等下一个键。
 --     - 下一个键是 i：撤回上一次上屏的内容(不管上一次上屏了几个字)，
---       用 commit_notifier 记录上次提交文本的长度，靠连续按退格实现。
---     - 下一个键还是 ; ，或者是回车：把等待中的分号真正提交(字面";")。
+--       靠 context:get_commit_text() 读取上次提交的文本、按字数退格实现。
+--     - 下一个键还是 ; ，或者是回车：把等待中的分号真正提交(中文模式下是
+--       全角"；"，西文模式下是半角";"，跟着 punctuator 的映射走)。
 --     - 其它任意键：先把等待中的分号提交，再放行当前键正常处理。
 --   打字过程中(正在composing)完全不介入，分号该怎样就怎样。
 --
--- 方案patch中引用方式：
---  engine/processors 里 punctuator 之前插入：
---  - lua_processor@*semicolon_delete*Semicolon_delete
+-- 方案patch中引用方式：rime.lua 里
+--   semicolon_delete_processor = require("semicolon_delete")
+-- schema.yaml 的 engine/processors 里 punctuator 之前插入：
+--   - lua_processor@semicolon_delete_processor
 
 local kRejected = 0
 local kAccepted = 1
@@ -21,28 +23,12 @@ local KEY_KP_ENTER = 0xff8d
 
 local function init(env)
     env.yt_pending_semi = false
-    env.yt_last_commit_len = 0
+end
+
+local function commit_semicolon(env, ascii_mode)
     pcall(function()
-        env.yt_commit_notifier = env.engine.context.commit_notifier:connect(function(ctx)
-            local text = ctx:get_commit_text()
-            if text and text ~= "" then
-                local n = utf8.len(text)
-                if n then
-                    env.yt_last_commit_len = n
-                end
-            end
-        end)
+        env.engine:commit_text(ascii_mode and ";" or "；")
     end)
-end
-
-local function fini(env)
-    if env.yt_commit_notifier then
-        pcall(function() env.yt_commit_notifier:disconnect() end)
-    end
-end
-
-local function commit_semicolon(env)
-    pcall(function() env.engine:commit_text(";") end)
 end
 
 local function do_backspace(env, n)
@@ -60,7 +46,8 @@ local function Semicolon_delete(key, env)
 
     local context = env.engine.context
     local ok, ascii_mode = pcall(function() return context:get_option("ascii_mode") end)
-    if ok and ascii_mode then
+    ascii_mode = ok and ascii_mode
+    if ascii_mode then
         return kNoop -- 西文模式下完全不介入
     end
     if context:is_composing() then
@@ -74,18 +61,20 @@ local function Semicolon_delete(key, env)
     if env.yt_pending_semi then
         env.yt_pending_semi = false
         if code == KEY_I then
-            local n = env.yt_last_commit_len or 0
-            if n > 0 then
-                do_backspace(env, n)
-                env.yt_last_commit_len = 0
+            local ok2, text = pcall(function() return context:get_commit_text() end)
+            if ok2 and text and text ~= "" then
+                local n = utf8.len(text) or 0
+                if n > 0 then
+                    do_backspace(env, n)
+                end
             end
             return kAccepted
         elseif code == KEY_SEMICOLON or code == KEY_RETURN or code == KEY_KP_ENTER then
-            commit_semicolon(env)
+            commit_semicolon(env, ascii_mode)
             return kAccepted
         else
             -- 其它键：先把分号原样打出来，再放行这个键正常处理。
-            commit_semicolon(env)
+            commit_semicolon(env, ascii_mode)
             return kNoop
         end
     end
@@ -98,4 +87,4 @@ local function Semicolon_delete(key, env)
     return kNoop
 end
 
-return { init = init, func = Semicolon_delete, fini = fini }
+return { init = init, func = Semicolon_delete }

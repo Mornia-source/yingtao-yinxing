@@ -154,7 +154,7 @@ punctuator:
     '.' : { commit: 。 }
     '?' : { commit: ？ }
     '/' : [ 、, '/', ／, ÷ ]
-    '`' : '`'
+    '`' : '·'
     '~' : [ '~', ～ ]
   full_shape:
     ' ' : { commit: '　' }
