@@ -17,6 +17,7 @@ openfly 是对 v9 时代的复刻且已停更（2024-09）；社区里还在维�
 """
 import io, os
 
+from shape import ShapeEncoder
 from zrm import encode_zrm_variants
 from tier_boost import boosted_weight
 
@@ -97,24 +98,35 @@ def load_words():
     return list(seen.values())
 
 
-def codes_for(text, zrm_variants, firsts):
-    """按樱桃音形规则返回该词的全部编码（简码 + 全码，不再有形码扩展码）。"""
+def codes_for(text, zrm_variants, firsts, shapes=None):
+    """按樱桃音形规则返回该词的全部编码（简码 + 全码）。
+
+    shapes：每个字的2位形码（取不到就是 None）。二字词/三字词的全码在
+    纯双拼版本之外，再各加一种把最后一个字换成形码的混合版本——码长不变
+    （还是4位），但同音异调词（比如"梅花"vs"美化"）打这个字的形码就能
+    避开纯拼音层面的撞车，不需要退化成逐字打单字全码。
+    """
     n = len(text)
     out = []
     fulls = []
     if n == 2:
         # 简码 = 前字前两位 + 后字首位（3位）
-        # 全码 = 前字前两位 + 后字前两位（4位）
+        # 全码 = 前字前两位 + 后字前两位（4位），另有前字前两位+后字形码的混合版
         # 2位编码专属于单字双拼（见 gen_chars.py），词组一律从3位起。
         for z0 in zrm_variants[0]:
             for z1 in zrm_variants[1]:
                 fulls.append(z0 + z1)
             out.append(z0 + firsts[1])
+            if shapes and shapes[1]:
+                fulls.append(z0 + shapes[1])
     elif n == 3:
-        # 简码 = 三字首码（3位）；全码 = 前两字首码 + 第三字前两位（4位）
+        # 简码 = 三字首码（3位）；全码 = 前两字首码 + 第三字前两位（4位），
+        # 另有前两字首码+第三字形码的混合版
         out.append(firsts[0] + firsts[1] + firsts[2])
         for z2 in zrm_variants[2]:
             fulls.append(firsts[0] + firsts[1] + z2)
+        if shapes and shapes[2]:
+            fulls.append(firsts[0] + firsts[1] + shapes[2])
     elif n == 4:
         fulls.append("".join(firsts))
     else:
@@ -125,6 +137,14 @@ def codes_for(text, zrm_variants, firsts):
 
 
 def main():
+    enc = ShapeEncoder()
+    shape_cache = {}
+
+    def shape_of(ch):
+        if ch not in shape_cache:
+            shape_cache[ch] = enc.shape(ch)[0] or None
+        return shape_cache[ch]
+
     rows = load_words()
 
     out = []
@@ -144,7 +164,13 @@ def main():
             skipped += 1
             continue
 
-        for code in codes_for(text, zrm_variants, firsts):
+        shapes = None
+        if len(text) in (2, 3):
+            # 只需要最后一个字的形码，用来生成混合版全码
+            shapes = [None] * len(text)
+            shapes[-1] = shape_of(text[-1])
+
+        for code in codes_for(text, zrm_variants, firsts, shapes):
             out.append((text, code, weight))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
