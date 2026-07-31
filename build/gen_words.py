@@ -98,39 +98,31 @@ def load_words():
     return list(seen.values())
 
 
-def codes_for(text, zrm_variants, firsts, shapes=None):
+def codes_for(text, zrm_variants, firsts, tail_shape=None):
     """按樱桃音形规则返回该词的全部编码（简码 + 全码）。
 
-    shapes：每个字的2位形码（取不到就是 None）。二字词/三字词的全码在
-    纯双拼版本之外，再各加一种把最后一个字换成形码的混合版本——码长不变
-    （还是4位），但同音异调词（比如"梅花"vs"美化"）打这个字的形码就能
-    避开纯拼音层面的撞车，不需要退化成逐字打单字全码。
+    全码统一为「首字双拼(2位) + 末字形码(2位)」，所有词长通用——2字词
+    不再是首尾都用双拼，4字词/5字以上也不再是纯首字母拼接，一律用这条
+    规则，4位定长。这样同音异调词（比如"梅花"vs"美化"，梅/美同音、
+    花/化同音）纯拼音会完全撞车，但末字形码不同，各自的全码自然唯一
+    （mzax / mzwx），不需要逐字打两个单字的全码。
+
+    简码只有二字词/三字词还留着，图快：
+      二字词 = 前字前两位 + 后字首位（3位）
+      三字词 = 三字首码（3位）
     """
     n = len(text)
     out = []
     fulls = []
     if n == 2:
-        # 简码 = 前字前两位 + 后字首位（3位）
-        # 全码 = 前字前两位 + 后字前两位（4位），另有前字前两位+后字形码的混合版
-        # 2位编码专属于单字双拼（见 gen_chars.py），词组一律从3位起。
         for z0 in zrm_variants[0]:
-            for z1 in zrm_variants[1]:
-                fulls.append(z0 + z1)
             out.append(z0 + firsts[1])
-            if shapes and shapes[1]:
-                fulls.append(z0 + shapes[1])
     elif n == 3:
-        # 简码 = 三字首码（3位）；全码 = 前两字首码 + 第三字前两位（4位），
-        # 另有前两字首码+第三字形码的混合版
         out.append(firsts[0] + firsts[1] + firsts[2])
-        for z2 in zrm_variants[2]:
-            fulls.append(firsts[0] + firsts[1] + z2)
-        if shapes and shapes[2]:
-            fulls.append(firsts[0] + firsts[1] + shapes[2])
-    elif n == 4:
-        fulls.append("".join(firsts))
-    else:
-        fulls.append(firsts[0] + firsts[1] + firsts[2] + firsts[-1])
+
+    if tail_shape:
+        for z0 in zrm_variants[0]:
+            fulls.append(z0 + tail_shape)
 
     out.extend(fulls)
     return out
@@ -164,13 +156,11 @@ def main():
             skipped += 1
             continue
 
-        shapes = None
-        if len(text) in (2, 3):
-            # 只需要最后一个字的形码，用来生成混合版全码
-            shapes = [None] * len(text)
-            shapes[-1] = shape_of(text[-1])
+        # 末字查不到形码（极少数生僻字）时，退回该字自己的双拼两位，
+        # 保证任何词都至少有一条全码，不会因为一个字缺形码就丢词。
+        tail_shape = shape_of(text[-1]) or zrm_variants[-1][0]
 
-        for code in codes_for(text, zrm_variants, firsts, shapes):
+        for code in codes_for(text, zrm_variants, firsts, tail_shape):
             out.append((text, code, weight))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
