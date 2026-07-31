@@ -15,7 +15,8 @@ schema:
     三字词 = 简码 三字首码(3位)；全码 前两字首码+第三字前两位(4位)
     四字词 = 四字首码(4位)
     五字及以上 = 前三字首码 + 末字首码(4位)
-    以上各词长在 4 位全码之后都可再打 2 位形码(最后两个字的首字根)精确定位。
+    词组只有简码/全码，不再有形码扩展码；长句连续输入时的重码交给
+    enable_sentence 整句上下文打分去挑，不要求逐词手动定位到唯一候选。
     候选排序：字数少的优先，全码精确匹配的候选例外，同字数内按权重排。
     临时反查：z 引导全拼，/ 引导98五笔。
   dependencies:
@@ -59,23 +60,19 @@ engine:
     # 返回 {函数名 = 函数} 的表，写成 lua_filter@char_priority 会报
     # "func type: nil"，整条候选链会崩掉、完全打不出字。
     - lua_filter@*char_priority*Char_priority_filter
-    # 双字词同时有 4 码和 6 码词条，打 4 码时它自己的 6 码会作为补全候选
-    # 再冒出来一次，这里去重。放在排序之后，保证留下的是权重高的那条。
     - uniquifier
 
 speller:
   delimiter: " '"
   alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA
   initials: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA
-  # 抬到 6 是为了让双字词的 6 码精确码打得出来。librime 里
-  # AutoSelectAtMaxCodeLength 会在候选码长达到 max_code_length 时直接确认
-  # 当前选中项（不管有几个候选），如果这里还是 4，第 5、6 码根本没机会输入。
-  max_code_length: 6
+  # 6 码形码扩展码已取消，最长编码回落到 4 位（单字全码/词组全码）。
+  max_code_length: 4
   auto_select: true
-  # AutoSelectUniqueCandidate 要求「候选恰好只有 1 个」才自动上屏，
-  # 所以这条规则的实际效果是：4 码唯一 → 直接上屏（本来也不需要 6 码）；
-  # 4 码撞车 → 不上屏，可以继续打 2 位形码精确定位；6 码唯一 → 上屏。
-  auto_select_pattern: "^[a-z]{4}$|^[a-z]{6}$"
+  # AutoSelectAtMaxCodeLength：某一段编码打满 4 位后自动确认当前排在
+  # 第一位的候选，不再要求手动选字/打形码精确定位——重码交给整句
+  # 连续输入时 enable_sentence 的上下文打分去挑。
+  auto_select_pattern: "^[a-z]{4}$"
 
 menu:
   page_size: 6

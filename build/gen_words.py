@@ -17,7 +17,6 @@ openfly 是对 v9 时代的复刻且已停更（2024-09）；社区里还在维�
 """
 import io, os
 
-from shape import ShapeEncoder
 from zrm import encode_zrm_variants
 from tier_boost import boosted_weight
 
@@ -98,13 +97,8 @@ def load_words():
     return list(seen.values())
 
 
-def codes_for(text, zrm_variants, firsts, tail_shapes=None):
-    """按樱桃音形规则返回该词的全部编码。
-
-    tail_shapes = (倒数第二字首字根, 末字首字根)，用来在 4 码全码之后
-    再发一条 6 码精确码。所有词长统一「取最后两个字的首字根」——双字词
-    正好就是它自己的两个字，规则完全一致。
-    """
+def codes_for(text, zrm_variants, firsts):
+    """按樱桃音形规则返回该词的全部编码（简码 + 全码，不再有形码扩展码）。"""
     n = len(text)
     out = []
     fulls = []
@@ -127,19 +121,14 @@ def codes_for(text, zrm_variants, firsts, tail_shapes=None):
         fulls.append(firsts[0] + firsts[1] + firsts[2] + firsts[-1])
 
     out.extend(fulls)
-    if tail_shapes:
-        for full in fulls:
-            out.append(full + tail_shapes[0] + tail_shapes[1])
     return out
 
 
 def main():
-    enc = ShapeEncoder()
     rows = load_words()
 
     out = []
     skipped = 0
-    shape_cache = {}
     for text, syls, weight in rows:
         zrm_variants = []
         firsts = []
@@ -155,25 +144,16 @@ def main():
             skipped += 1
             continue
 
-        # 扩展码用「最后两个字的首字根」，所有词长统一
-        tail_shapes = None
-        s = []
-        for c in text[-2:]:
-            if c not in shape_cache:
-                shape_cache[c] = (enc.shape(c)[0] or "")
-            s.append(shape_cache[c])
-        if s[0] and s[1]:
-            tail_shapes = (s[0][0], s[1][0])
-
-        for code in codes_for(text, zrm_variants, firsts, tail_shapes):
+        for code in codes_for(text, zrm_variants, firsts):
             out.append((text, code, weight))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")
         f.write("# 樱桃音形 - 词组码表（二字词/三字词/四字词/多字词）\n")
         f.write("# 词表/注音/词频来源: rime-ice 雾凇拼音 基础词库\n")
-        f.write("# 各词长除简码/全码外，另有6码=全码+最后两个字的首字根，供4码撞车时精确定位\n")
-        f.write("#\n---\nname: yingtao_words\nversion: \"3.0\"\nsort: by_weight\n...\n")
+        f.write("# 只有简码/全码，不再有形码扩展码——词组撞车靠整句连续输入时\n")
+        f.write("# 上下文自动断句消歧，而不是逐词手动打形码精确定位\n")
+        f.write("#\n---\nname: yingtao_words\nversion: \"4.0\"\nsort: by_weight\n...\n")
         for text, code, weight in out:
             f.write("%s\t%s\t%d\n" % (text, code, boosted_weight(code, weight, text)))
 
