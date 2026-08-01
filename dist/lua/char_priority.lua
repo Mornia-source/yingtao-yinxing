@@ -1,17 +1,18 @@
--- 樱桃音形专用过滤器：候选队列前段重排，优先级从高到低：
---   1. 全码精确匹配的候选（当前已经打的编码正好是它自己的编码，不用再
---      多打字就能选中）——按 quality 排，不受字数限制。
---   2. 其余候选（还需要多打字才能补全，比如4码全码打完时冒出来的
---      6码精确码提示）——先按字数少的优先，同字数内再按 quality 排。
--- "精确匹配"用 cand.comment 是否为空来判断：table_translator 只在
--- 候选需要补全时才会给 comment 挂上剩余编码提示，精确匹配的候选
--- comment 天生是空的，不用额外传参数、也不用去猜当前输入长度。
+-- 樱桃音形专用过滤器：候选队列前段重排，绝对按字数少优先，不管候选是
+-- 不是全码精确匹配——字数相同再按 quality 排。
+--
+-- 曾经有条"全码精确匹配的候选例外于字数排序"的规则(精确匹配只按权重
+-- 排，不管字数)，v4.0 把词组全码统一成"首字双拼+末字形码"之后，单字
+-- 和词组撞同一个编码的情况变多了(比如"谁"这个单字和"水文""水平考试"
+-- 这些词全码都是 uvyy)，这条例外规则的副作用就更明显——"谁"这种单字
+-- 会因为词组权重更高被排到词组后面，字数少优先看起来"失效"了。现在
+-- 去掉这条例外，字数少绝对优先，不再有精确匹配的特殊待遇。
 --
 -- 起因：Rime 的补全(completion)候选是按编码本身在字根树里的顺序枚举
 -- 出来的，不是全局按词频/权重排序的；tier_boost.py 已经把"编码位数越少
 -- 权重越高"这条规则揉进了词典权重(2位单字 > 3位简码 > 4位全码，同位数
 -- 内再按词频)，配合这里的重排，"字优先于词""位数少的优先""同位数内
--- 更常用的优先""全码精确匹配的例外"这几条规则就都能满足。
+-- 更常用的优先"这几条规则就都能满足。
 --
 -- 之前直接用 table.sort(cands, function(a,b) return a.quality>b.quality end)
 -- 上过一次线，结果把候选顺序搞得更乱——推测是候选里混入了quality不是
@@ -32,7 +33,6 @@ local function sorted_or_original(buf)
 
     local quality = {}
     local length = {}
-    local exact = {}
     for i = 1, n do
         local q = buf[i].quality
         if type(q) ~= "number" then
@@ -40,27 +40,13 @@ local function sorted_or_original(buf)
         end
         quality[i] = q
         length[i] = utf8.len(buf[i].text) or 99
-        local c = buf[i].comment
-        exact[i] = (c == nil or c == "")
     end
 
     local idx = {}
     for i = 1, n do idx[i] = i end
 
     local ok = pcall(table.sort, idx, function(a, b)
-        -- 第一优先级：全码精确匹配的候选整体排在需要继续补全的候选前面。
-        if exact[a] ~= exact[b] then
-            return exact[a]
-        end
-        if exact[a] then
-            -- 都是精确匹配：不受字数限制，直接按权重比，让"全码精确
-            -- 匹配"真正例外于"字数少优先"这条规则。
-            if quality[a] ~= quality[b] then
-                return quality[a] > quality[b]
-            end
-            return a < b
-        end
-        -- 都是补全候选：字数少的排前面，同字数内再按权重排。
+        -- 绝对字数优先：不管是不是全码精确匹配，字数少的都排前面。
         if length[a] ~= length[b] then
             return length[a] < length[b]
         end
