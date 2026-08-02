@@ -131,18 +131,18 @@ class ShapeEncoder:
         if root_code:
             if len(root_code) == 1:
                 return root_code[0] + root_code[0], "ref"
-            return root_code[0] + root_code[-1], "ref"
+            return root_code[0] + root_code[1], "ref"
         ls = self.leaves(char)
         if len(ls) >= 2:
             fk = self.atom_first.get(ls[0])
-            lk = self.atom_first.get(ls[-1])
-            if fk and lk:
-                return fk + lk, "decomp"
+            sk = self.atom_first.get(ls[1])
+            if fk and sk:
+                return fk + sk, "decomp"
         code = self.longest_code.get(char)
         if code:
             if len(code) == 1:
                 return code[0] + code[0], "own1"
-            return code[0] + code[-1], "own-full"
+            return code[0] + code[1], "own-full"
         return None, "fail"
 
 
