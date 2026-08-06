@@ -18,7 +18,7 @@ openfly 是对 v9 时代的复刻且已停更（2024-09）；社区里还在维�
 import io, os
 
 from shape import ShapeEncoder
-from zrm import encode_zrm_variants
+from flypy import encode_flypy_variants as encode_zrm_variants
 from tier_boost import boosted_weight
 
 _HERE = os.path.dirname(os.path.abspath(__file__))

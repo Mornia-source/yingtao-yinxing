@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import io, os
 from shape import ShapeEncoder
-from zrm import encode_zrm, encode_zrm_variants
+from flypy import encode_flypy_variants
 from tier_boost import boosted_weight, SINGLE_KEY_CHARS
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -45,7 +45,7 @@ def main():
         py = pinyin.strip()
         if not py or not py.isalpha():
             continue
-        zrms = encode_zrm_variants(py)
+        zrms = encode_flypy_variants(py)
         if any(len(z) != 2 for z in zrms):
             # some rare finals (e.g. 'ng', 'm', 'hm') won't reduce to exactly 2 letters; skip gracefully
             missing.append((char, pinyin, "badzrm:" + repr(zrms)))
@@ -75,7 +75,7 @@ def main():
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")
         f.write("# 樱桃音形 - 单字全码表\n")
-        f.write("# 自然码双拼(2位) + 98五笔首末字根形码(2位)\n")
+        f.write("# 小鹤双拼(2位) + 98五笔首二字根形码(2位)\n")
         f.write("# 数据来源: rime-ice(拼音/字频), 用户提供的98五笔去识别码参考表(sources/wubi98_noident_8105.txt，首选)，\n")
         f.write("# lotem/rime-wubi98 + hanzi-chai/pychai(仅供参考表覆盖不到的极少数生僻字兜底)\n")
         f.write("#\n---\nname: yingtao_chars\nversion: \"1.0\"\nsort: by_weight\n...\n")
