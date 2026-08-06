@@ -61,6 +61,12 @@ def main():
             # 双拼码打完(2位)即可作为同音字候选出现，权重按字频排序，
             # 不必非要把形码也打完才能看到这个字；形码留给需要精确选字的时候用。
             out_lines.append("%s\t%s\t%d" % (char, zrm, boosted_weight(zrm, weight, char)))
+            # ；形码声明键：双拼后面显式插一个；再接形码，跟不声明的
+            # zrm+shp 是同一个字，纯粹是给长句连续输入时用来告诉分词器
+            # "这两位不是下一个字的双拼、是当前这个字的形码"，避免被自动
+            # 切分成别的东西。声明与否用户自己选，两种打法都认。
+            declared = zrm + ";" + shp
+            out_lines.append("%s\t%s\t%d" % (char, declared, boosted_weight(declared, weight, char)))
         char_weight[char] = weight
 
     # 单键硬性首选：给这26个字各发一条1位编码的词条，权重档位压过一切补全候选。

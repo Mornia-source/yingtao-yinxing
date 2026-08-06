@@ -63,15 +63,19 @@ engine:
 
 speller:
   delimiter: " '"
-  alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA
+  # ； 只放进 alphabet、不放进 initials：composing 状态下（已经打了
+  # 别的字母）按 ； 会被当成编码的一部分继续输入(；形码声明键，见下)；
+  # 完全空闲时按 ； 不算合法的起始字符，会落到 punctuator 直接出标点，
+  # 不需要另外写 lua_processor 去区分这两种状态。
+  alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA;
   initials: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA
-  # 6 码形码扩展码已取消，最长编码回落到 4 位（单字全码/词组全码）。
-  max_code_length: 4
+  # 最长编码是词组的；声明扩展码：全码(4位)+；(1位)+首字形码(2位) = 7位。
+  max_code_length: 7
   auto_select: true
-  # AutoSelectAtMaxCodeLength：某一段编码打满 4 位后自动确认当前排在
-  # 第一位的候选，不再要求手动选字/打形码精确定位——重码交给整句
-  # 连续输入时 enable_sentence 的上下文打分去挑。
-  auto_select_pattern: "^[a-z]{4}$"
+  # AutoSelectAtMaxCodeLength：三种码长满了都自动确认当前排第一的候选——
+  # 普通4位全码；单字的；声明码(双拼2位+；+形码2位，共5位)；
+  # 词组的；声明扩展码(全码4位+；+首字形码2位，共7位)。
+  auto_select_pattern: "^[a-z]{4}$|^[a-z]{2};[a-z]{2}$|^[a-z]{4};[a-z]{2}$"
 
 menu:
   page_size: 6
@@ -87,6 +91,10 @@ translator:
   # 只留下提示码本身。
   comment_format:
     - "xform/^~//"
+  # 编码里的 ； 只是内部用来分隔"双拼/全码部分"和"形码声明部分"的
+  # 标记字符，显示给用户看的时候换成全角冒号，跟真正的中文分号区分开。
+  preedit_format:
+    - "xform/;/：/"
 
 # 拼音反查放回 z（实测 table_translator 和 reverse_lookup_translator
 # 会同时给出候选，z开头的正常编码不会被吞掉，配合权重分档该赢的还是赢，
