@@ -27,9 +27,11 @@ _SOURCES = os.path.join(_HERE, "..", "sources")
 WORD_SOURCES = ["rime-ice.base.dict.yaml", "rime-ice.others.dict.yaml"]
 OUT = os.path.join(_HERE, "yingtao_words.dict.yaml")
 
-# 词频下限。0 = 全收。雾凇 base 里低频条目不少是生僻人名/地名/品牌，
-# 想压重码可以往上调（实测见 README）。
-MIN_FREQ = 0
+# 词频下限。雾凇全量 base+others 有 54 万词，词库越大重码越严重；
+# 参考小鹤音形官方码表(约5.8万词)的规模，这里定了一个门槛把量级
+# 收敛到差不多同一个数量级，压掉大量低频人名/地名/品牌词条。
+# 想要更全可以调低，想要更少重码可以调高，实测数据见 README。
+MIN_FREQ = 15000
 
 _pypinyin = None
 
