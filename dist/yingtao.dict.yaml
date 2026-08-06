@@ -2,8 +2,9 @@
 # encoding: utf-8
 #
 # 樱桃音形 - 总词典
-# 单字：自然码双拼(2位) + 98五笔首末字根形码(2位) = 4位全码
+# 单字：小鹤双拼(2位) + 98五笔首二字根形码(2位) = 4位全码
 # 词组：见 yingtao_chars.dict.yaml / yingtao_words.dict.yaml 内注释说明的取码规则
+# yingtao_emoji：emoji 名字词条，权重很低，只为了给 lua/yingtao_emoji.lua 识别用
 #
 ---
 name: yingtao
@@ -13,4 +14,5 @@ use_preset_vocabulary: false
 import_tables:
   - yingtao_chars
   - yingtao_words
+  - yingtao_emoji
 ...

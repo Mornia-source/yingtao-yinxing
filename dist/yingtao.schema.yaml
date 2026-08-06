@@ -59,6 +59,9 @@ engine:
     # 返回 {函数名 = 函数} 的表，写成 lua_filter@char_priority 会报
     # "func type: nil"，整条候选链会崩掉、完全打不出字。
     - lua_filter@*char_priority*Char_priority_filter
+    # 必须放在 char_priority 之后：先让字数/权重排序定下来，emoji
+    # 过滤器再往候选2的位置插，不然插进去的位置会被后面的排序打乱。
+    - lua_filter@*yingtao_emoji*Yingtao_emoji_filter
     - uniquifier
 
 speller:

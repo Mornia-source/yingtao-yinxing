@@ -28,7 +28,8 @@
    - `yingtao.dict.yaml`
    - `yingtao_chars.dict.yaml`
    - `yingtao_words.dict.yaml`
-   - `lua/char_priority.lua`（复制到用户目录下的 `lua` 子文件夹，没有就新建）
+   - `yingtao_emoji.dict.yaml`
+   - `lua/char_priority.lua`、`lua/yingtao_emoji.lua`、`lua/yingtao_emoji.txt`（复制到用户目录下的 `lua` 子文件夹，没有就新建）
    - `wubi98.schema.yaml` + `wubi98.dict.yaml`（供 `/` 五笔反查用；它不必加进 `schema_list`，樱桃音形的 `dependencies` 会带着它一起编译）
 3. 编辑用户目录下的 `default.custom.yaml`（没有就新建），加入：
 
@@ -135,6 +136,13 @@ v4.0 起去掉了词组的 6 位形码扩展码，改为依赖 Rime 自带的整
 - 三个开关（中西文、半全角、繁简）都加了 `reset: 0`，避免继承别的方案里的全角/繁体状态，导致回车提交出来的字母变成全角。
 
 **已知的取舍**：`enable_sentence` 的整句消歧要等看到足够多的后续输入才能确定前面怎么切，所以在整句真正确认（按空格/回车）之前，已经"猜出来"的部分都还留在候选框里、没有真正提交到你正在编辑的文档里；这是它能利用后文纠正前面误判的必要代价——如果改成边打边把猜好的部分提前推给外部程序，一旦后面的内容证明前面猜错了，程序化撤回已经交出去的文字在目前的 Rime lua 插件沙箱里做不到可靠实现（`engine:process_key()` 够不到已提交给外部程序的文字，用系统级按键注入又会导致目标程序卡顿、时序不可控，详见 git 历史里 `;`+`i` 撤回功能的踩坑记录），所以选择了"整句都算完再一次性提交"这个更安全的方向。
+
+## Emoji 支持
+
+打常用词时如果这个词正好有对应的 emoji（比如"微笑"、"疲惫"、"爱心"），emoji 会**固定出现在候选2的位置**；如果同一批候选里匹配上不止一个 emoji（一个词对应多个 emoji，或者好几个候选词各自对应不同 emoji），就依次排在候选3、4、5……候选1本身不受影响。emoji 候选是过滤器现造出来的合成候选，不是词典里真实存在、能被 user_dict 记录使用频率的词条，所以不会因为选用过某个 emoji 就提高它以后的优先级——每次的位置和顺序都是一样的。
+
+- **数据来源**：[iDvel/rime-ice](https://github.com/iDvel/rime-ice) 的 `opencc/emoji.txt`（一个名字可能对应多个 emoji，同一个 emoji 也可能有多个名字，两种多对多关系原始数据里都有），`build/gen_emoji.py` 处理成词条表（`yingtao_emoji.dict.yaml`，权重很低，只为了让名字能正常打出来）和查找表（`lua/yingtao_emoji.txt`）。过滤了超过6个字的超长名字（主要是国旗对应的国家全称），日常够用。
+- **实现**：`lua/yingtao_emoji.lua`，一个 `lua_filter`，排在 `char_priority`（字数/权重排序）之后、`uniquifier` 之前——候选顺序先按正常规则定下来，再把匹配到的 emoji 插到候选2，不会被后面的过滤器打乱位置。
 
 ## 中文标点
 
