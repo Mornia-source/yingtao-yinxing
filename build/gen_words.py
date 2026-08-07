@@ -100,38 +100,44 @@ def load_words():
     return list(seen.values())
 
 
-def codes_for(text, zrm_variants, firsts, tail_shape=None, head_shape=None):
+def codes_for(text, zrm_variants, firsts, tail_shape=None):
     """按樱桃音形规则返回该词的全部编码（简码 + 全码 + ；声明扩展码）。
 
-    全码统一为「首字双拼(2位) + 末字形码(2位)」，所有词长通用——2字词
-    不再是首尾都用双拼，4字词/5字以上也不再是纯首字母拼接，一律用这条
-    规则，4位定长。这样同音异调词（比如"梅花"vs"美化"，梅/美同音、
-    花/化同音）纯拼音会完全撞车，但末字形码不同，各自的全码自然唯一
-    （mzax / mzwx），不需要逐字打两个单字的全码。
-
-    简码只有二字词/三字词还留着，图快：
+    全码默认是纯拼音接龙，跟打字的直觉节奏一致，不会打到一半突然要
+    切换成"打形码"的逻辑：
+      二字词 = 前字双拼 + 后字双拼（4位）
+      三字词 = 前两字首码 + 第三字前两位（4位）
+      四字词 = 四字首码（4位）
+      五字及以上 = 前三字首码 + 末字首码（4位）
+    简码（图快用的额外短码）：
       二字词 = 前字前两位 + 后字首位（3位）
       三字词 = 三字首码（3位）
 
     ；声明扩展码：全码本身还重码时，用户可以主动在全码后面打 ；再接
-    首字形码，进一步消歧——码长不变道理和单字一样，只是这里用户得
-    显式按一下 ；才会用到，不会默默增加候选噪音。默认不声明就是普通
-    全码，两种打法都认。
+    末字形码，进一步消歧（比如"梅花"/"美化"字面撞车，用；声明区分）。
+    这是唯一会用到形码的地方，且必须用户主动打 ；才会用到，默认打字
+    从头到尾都是纯拼音，不会被"形码"打断。
     """
     n = len(text)
     out = []
     fulls = []
     if n == 2:
         for z0 in zrm_variants[0]:
+            for z1 in zrm_variants[1]:
+                fulls.append(z0 + z1)
             out.append(z0 + firsts[1])
     elif n == 3:
         out.append(firsts[0] + firsts[1] + firsts[2])
+        for z2 in zrm_variants[2]:
+            fulls.append(firsts[0] + firsts[1] + z2)
+    elif n == 4:
+        fulls.append("".join(firsts))
+    else:
+        fulls.append(firsts[0] + firsts[1] + firsts[2] + firsts[-1])
 
     if tail_shape:
-        for z0 in zrm_variants[0]:
-            fulls.append(z0 + tail_shape)
-            if head_shape:
-                out.append(z0 + tail_shape + ";" + head_shape)
+        for full in fulls:
+            out.append(full + ";" + tail_shape)
 
     out.extend(fulls)
     return out
@@ -165,20 +171,20 @@ def main():
             skipped += 1
             continue
 
-        # 末字查不到形码（极少数生僻字）时，退回该字自己的双拼两位，
-        # 保证任何词都至少有一条全码，不会因为一个字缺形码就丢词。
-        tail_shape = shape_of(text[-1]) or zrm_variants[-1][0]
-        head_shape = shape_of(text[0])
+        # 末字查不到形码（极少数生僻字）时，跳过；声明扩展码，
+        # 全码本身不受影响。
+        tail_shape = shape_of(text[-1])
 
-        for code in codes_for(text, zrm_variants, firsts, tail_shape, head_shape):
+        for code in codes_for(text, zrm_variants, firsts, tail_shape):
             out.append((text, code, weight))
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Rime dictionary\n# encoding: utf-8\n#\n")
         f.write("# 樱桃音形 - 词组码表（二字词/三字词/四字词/多字词）\n")
         f.write("# 词表/注音/词频来源: rime-ice 雾凇拼音 基础词库\n")
-        f.write("# 简码/全码之外，还有一条用户主动打；声明的扩展码(全码+；+首字形码)，\n")
-        f.write("# 供全码本身还重码时进一步消歧，默认不声明不受影响\n")
+        f.write("# 全码默认纯拼音接龙，简码/全码之外还有一条用户主动打；声明的\n")
+        f.write("# 扩展码(全码+；+末字形码)，供全码本身还重码时进一步消歧，\n")
+        f.write("# 默认不声明不受影响\n")
         f.write("#\n---\nname: yingtao_words\nversion: \"5.0\"\nsort: by_weight\n...\n")
         for text, code, weight in out:
             f.write("%s\t%s\t%d\n" % (text, code, boosted_weight(code, weight, text)))
